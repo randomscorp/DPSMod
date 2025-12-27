@@ -9,37 +9,40 @@ using BepInEx.Logging;
 namespace DPSMod
 {
     [Harmony]
-    [BepInPlugin("io.github.randomscorp.dpsmod","DPS Mod","1.0")]
+    [BepInPlugin("io.github.randomscorp.dpsmod","DPS Mod","1.1")]
     public partial class DPSModPlugin : BaseUnityPlugin
     {
-
-        internal static GameObject GO;
+        internal static GameObject dpsCanvas;
         public static ConfigEntry<float> timeToReset;
         public static ConfigEntry<float> timeBetweenUpdates;
+        public static ConfigEntry<int> textFontSize;
         public static ConfigEntry<TextAnchor> alignment;
-        public static ManualLogSource logger;
+        public static DPSDisplay displayMonoB;
+        public static ConfigEntry<bool> showTimeInComboat;
+
         private void Awake()
         {
-            DPSModPlugin.timeToReset = Config.Bind("Gameplay","Time in seconds to reset the dps counter",5f);
-            DPSModPlugin.timeBetweenUpdates = Config.Bind("Gameplay","Time in seconds to update the display, set 0 for real time",1f);
-            DPSModPlugin.alignment = Config.Bind("UI","Text position", TextAnchor.UpperRight);
+            timeToReset = Config.Bind("Gameplay","Time to reset",5f,"Time in seconds to reset the counters after doing no damage");
+            timeBetweenUpdates = Config.Bind("Gameplay","Time to update",1f,"Time to update the DPS counter");
+            alignment = Config.Bind("UI","Text Position", TextAnchor.UpperRight,"UI position, updates in real time");
+                alignment.SettingChanged += (_, _) => { DPSModPlugin.displayMonoB.text.alignment = DPSModPlugin.alignment.Value; };
+            textFontSize= Config.Bind("UI", "Text Size", 20, "The font size used to render the display");
+                textFontSize.SettingChanged += (_, _) => { DPSModPlugin.displayMonoB.text.fontSize = DPSModPlugin.textFontSize.Value; };
 
-            GO = new GameObject() { name="DPS Display"};
-            GO.layer = ((int)PhysLayers.UI);
-            
-            GO.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            GO.AddComponent<CanvasScaler>();
-            GameObject.DontDestroyOnLoad(GO);
-            
-            GO.AddComponent<CanvasRenderer>();
+            showTimeInComboat = Config.Bind("UI", "Show Time in combat counter?", true);
 
-            var text = GO.AddComponent<Text>();
-            text.fontSize = 30;
-            text.font = Font.GetDefault();
-            text.text = "PLACEHOLDER";
-            text.alignment = DPSModPlugin.alignment.Value;
+            dpsCanvas = new GameObject() { name="DPS Canvas"};
+                GameObject.DontDestroyOnLoad(dpsCanvas);
+                dpsCanvas.layer = ((int)PhysLayers.UI);
+                dpsCanvas.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+                dpsCanvas.AddComponent<RectTransform>();
 
-            GO.AddComponent<DPSDisplay>();
+            var text = dpsCanvas.AddComponent<Text>();
+                text.fontSize = textFontSize.Value;
+                text.font = Font.GetDefault();
+                text.text = "PLACEHOLDER";
+                text.alignment = alignment.Value;
+                DPSModPlugin.displayMonoB = dpsCanvas.AddComponent<DPSDisplay>();
 
             new Harmony("io.github.dpsmod").PatchAll();
         }
@@ -48,43 +51,44 @@ namespace DPSMod
         [HarmonyPrefix]
         private static void SaveHealthBefore0(HealthManager __instance, HitInstance hitInstance)
         {
-            DPSModPlugin.GO.GetComponent<DPSDisplay>().hp_before += __instance.hp;
+            DPSModPlugin.displayMonoB.hpBeforeEachHit = __instance.hp;
         }
 
         [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.TakeDamage))]
         [HarmonyPostfix]
         private static void DamageDealt(HealthManager __instance, HitInstance hitInstance)
         {
-            var display = DPSModPlugin.GO.GetComponent<DPSDisplay>();
-            display.hp_after += __instance.hp;
+            var display = DPSModPlugin.displayMonoB;
+            double damageDone = DPSModPlugin.displayMonoB.hpBeforeEachHit - __instance.hp >=0? __instance.hp:0;
+            DPSModPlugin.displayMonoB.totalDamageDone += damageDone;
+
             display.timeSinceLastDamage = 0;
         }
     }
 
-    internal class DPSDisplay : MonoBehaviour
+    public class DPSDisplay : MonoBehaviour
     {
-        //public float damageDone = 0f;
-        public float timeSinceLastDamage = 0f;
+        public float timeSinceLastDamage;
         private float timeDoingDamage = 0f;
 
         public float timeSinceLastUpdate = 0f;
 
-        public double hp_before = 0f;
-        public double hp_after = 0f;
+        public double hpBeforeEachHit = 0f;
+        public double totalDamageDone = 0f;
 
-        private Text text;
+        public Text text;
 
         void Awake()
         {
             this.text = this.gameObject.GetComponent<Text>();
+            timeSinceLastDamage = DPSModPlugin.timeToReset.Value;
         }
 
         void FixedUpdate()
         {
             if (timeSinceLastDamage >= DPSModPlugin.timeToReset.Value)
             {
-                hp_before = 0;
-                hp_after = 0;
+                totalDamageDone= 0f;
                 timeDoingDamage = 0;
             }
             else
@@ -95,7 +99,10 @@ namespace DPSMod
             timeSinceLastUpdate +=Time.deltaTime;
             if (timeSinceLastUpdate > DPSModPlugin.timeBetweenUpdates.Value)
             {
-                text.text ="DPS: " + ( timeDoingDamage ==0?"0": ((hp_before -hp_after) / timeDoingDamage).ToString("F2"));
+                text.text = $"DPS: {(timeDoingDamage == 0 ? "0" : (totalDamageDone / timeDoingDamage).ToString("F2"))}" +
+                    System.Environment.NewLine +
+                    $"Total damage: {totalDamageDone}";
+                if (DPSModPlugin.showTimeInComboat.Value) text.text+= System.Environment.NewLine + $"Time in combat: {timeDoingDamage.ToString("F2")}";
                 timeSinceLastUpdate = 0;
             }
         }
