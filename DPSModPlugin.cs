@@ -59,8 +59,9 @@ namespace DPSMod
         private static void DamageDealt(HealthManager __instance, HitInstance hitInstance)
         {
             var display = DPSModPlugin.displayMonoB;
-            double damageDone = DPSModPlugin.displayMonoB.hpBeforeEachHit - __instance.hp >=0? __instance.hp:0;
-            DPSModPlugin.displayMonoB.totalDamageDone += damageDone;
+            double damageDone = DPSModPlugin.displayMonoB.hpBeforeEachHit - __instance.hp;
+         
+            DPSModPlugin.displayMonoB.totalDamageDone += damageDone >= 0 ? damageDone: DPSModPlugin.displayMonoB.hpBeforeEachHit;
 
             display.timeSinceLastDamage = 0;
         }
@@ -97,14 +98,19 @@ namespace DPSMod
             }
             timeSinceLastDamage += Time.deltaTime;
             timeSinceLastUpdate +=Time.deltaTime;
-            if (timeSinceLastUpdate > DPSModPlugin.timeBetweenUpdates.Value)
+
+            if(timeSinceLastUpdate > DPSModPlugin.timeBetweenUpdates.Value)
             {
-                text.text = $"DPS: {(timeDoingDamage == 0 ? "0" : (totalDamageDone / timeDoingDamage).ToString("F2"))}" +
-                    System.Environment.NewLine +
-                    $"Total damage: {totalDamageDone}";
-                if (DPSModPlugin.showTimeInComboat.Value) text.text+= System.Environment.NewLine + $"Time in combat: {timeDoingDamage.ToString("F2")}";
-                timeSinceLastUpdate = 0;
+                text.text = $"DPS: {(timeDoingDamage == 0 ? "0" : (totalDamageDone / timeDoingDamage).ToString("F2"))}";
+                timeSinceLastUpdate=0;
             }
+            else
+            {
+                text.text = text.text.Split(System.Environment.NewLine)[0];
+            }
+            text.text += System.Environment.NewLine +
+                    $"Total damage: {totalDamageDone}";
+                if (DPSModPlugin.showTimeInComboat.Value) text.text += System.Environment.NewLine + $"Time in combat: {timeDoingDamage.ToString("F2")}";
         }
     }
 }
