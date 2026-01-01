@@ -1,0 +1,8 @@
+{
+  "name": "DPSMod",
+  "version_number": "1.2.0",
+  "website_url": "https://github.com/randomscorp/DPSMod",
+  "description": "Shows your dps",
+  "dependencies": [
+  ]
+}

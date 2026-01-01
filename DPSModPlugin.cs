@@ -9,7 +9,7 @@ using BepInEx.Logging;
 namespace DPSMod
 {
     [Harmony]
-    [BepInPlugin("io.github.randomscorp.dpsmod","DPS Mod","1.1")]
+    [BepInPlugin("io.github.randomscorp.dpsmod","DPS Mod","1.2.0")]
     public partial class DPSModPlugin : BaseUnityPlugin
     {
         internal static GameObject dpsCanvas;
@@ -19,6 +19,8 @@ namespace DPSMod
         public static ConfigEntry<TextAnchor> alignment;
         public static DPSDisplay displayMonoB;
         public static ConfigEntry<bool> showTimeInComboat;
+
+        public static ConfigEntry<bool> showDisplay;
 
         private void Awake()
         {
@@ -31,11 +33,15 @@ namespace DPSMod
 
             showTimeInComboat = Config.Bind("UI", "Show Time in combat counter?", true);
 
+            showDisplay = Config.Bind("UI", "Display visible", true);
+            showDisplay.SettingChanged += (_, _) => { dpsCanvas.SetActive(showDisplay.Value); };
+
             dpsCanvas = new GameObject() { name="DPS Canvas"};
                 GameObject.DontDestroyOnLoad(dpsCanvas);
                 dpsCanvas.layer = ((int)PhysLayers.UI);
                 dpsCanvas.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
                 dpsCanvas.AddComponent<RectTransform>();
+                dpsCanvas.SetActive(showDisplay.Value);
 
             var text = dpsCanvas.AddComponent<Text>();
                 text.fontSize = textFontSize.Value;
@@ -44,7 +50,7 @@ namespace DPSMod
                 text.alignment = alignment.Value;
                 DPSModPlugin.displayMonoB = dpsCanvas.AddComponent<DPSDisplay>();
 
-            new Harmony("io.github.dpsmod").PatchAll();
+            new Harmony("io.github.randomscorp.dpsmod").PatchAll();
         }
 
         [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.TakeDamage))]

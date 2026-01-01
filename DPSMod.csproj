@@ -46,10 +46,14 @@
     <PropertyGroup>
       <ExportFolder>bin/Publish</ExportFolder>
     </PropertyGroup>
-
-    <RemoveDir Directories="$(IntermediateOutputPath)/archive" />
-    <MakeDir Directories="$(ExportFolder)" />
+	  
+	<Copy SourceFiles="icon.png" DestinationFolder="$(IntermediateOutputPath)/archive" />
+	<Copy SourceFiles="manifest.json" DestinationFolder="$(IntermediateOutputPath)/archive" />
+	<Copy SourceFiles="README.md" DestinationFolder="$(IntermediateOutputPath)/archive" />
+    
+	<MakeDir Directories="$(ExportFolder)" />
     <Copy SourceFiles="@(Binaries)" DestinationFolder="$(IntermediateOutputPath)/archive" />
     <ZipDirectory SourceDirectory="$(IntermediateOutputPath)/archive" DestinationFile="$(ExportFolder)/$(TargetName).zip" Overwrite="True" />
+    <RemoveDir Directories="$(IntermediateOutputPath)/archive" />
   </Target>
 </Project>
